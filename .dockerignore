@@ -1,0 +1,4 @@
+/venv/
+utils/age_model_weights.h5
+utils/gender_model_weights.h5
+.git

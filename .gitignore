@@ -1,0 +1,14 @@
+/venv/
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+/deb
+utils/age_model_weights.h5
+utils/gender_model_weights.h5
