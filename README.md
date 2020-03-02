@@ -42,8 +42,9 @@ This project is performed on Jetson Nano with Balena OS, which is implemented by
     
 - Python 3.6 environment
 
-- Download zip file which contains tbz2 files for setup cuda cudn on Jetson Nano and opencv files from and extract it 
-in this project directory.
+- Download zip file which contains tbz2 files for setup cuda cudn on Jetson Nano and opencv files from 
+https://drive.google.com/file/d/1yiIcHe8gjH-5ji6tzz5dlblQM7EjuunP/view?usp=sharing and extract it in this project 
+directory.
 
 ## Project Execution
 
