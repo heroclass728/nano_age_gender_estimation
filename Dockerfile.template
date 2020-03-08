@@ -2,7 +2,7 @@ FROM balenalib/jetson-nano-ubuntu:bionic
 
 WORKDIR /usr/src/app
 
-COPY ./deb/*.* ./
+COPY packages ./
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -16,12 +16,9 @@ RUN \
     rm -rf *.deb && \
     dpkg --remove cuda-repo-l4t-10-0-local-10.0.326 && \
     dpkg -P cuda-repo-l4t-10-0-local-10.0.326 && \
+    mv /usr/local/cuda-10.0 /usr/local/cuda && \
     echo "/usr/lib/aarch64-linux-gnu/tegra" > /etc/ld.so.conf.d/nvidia-tegra.conf && \
     ldconfig
-
-RUN \
-    rm -rf /usr/local/cuda-10.0/targets && \
-    rm -rf /usr/local/cuda-10.0/doc
 
 # If planning to do only headles GPU computing, without video
 # display do not install xorg
@@ -50,10 +47,6 @@ RUN ./build_opencv_4_1.sh
 
 RUN apt update
 RUN apt install -y libhdf5-serial-dev hdf5-tools
-#RUN find /usr -iname libhdf5.so
-#RUN pip uninstall h5py
-#RUN pip install --no-cache-dir h5py
-#ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/hdf5/lib
 RUN pip3 install --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v42 tensorflow-gpu==1.13.1+nv19.3 --user
 
 # This will copy all files in our root to the working  directory in the container
