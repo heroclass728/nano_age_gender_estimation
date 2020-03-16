@@ -1,7 +1,7 @@
 from utils.model_loading import load_vgg_face_model
-from keras.models import Model, Sequential
+from keras.models import Model, Sequential, save_model
 from keras.layers import Convolution2D, Flatten, Activation
-from settings import AGE_MODEL_PATH, GENDER_MODEL_PATH
+from settings import AGE_MODEL_WEIGHT_PATH, GENDER_MODEL_WEIGHT_PATH
 
 
 def age_model():
@@ -17,7 +17,8 @@ def age_model():
 
     # you can find the pre-trained weights for age prediction here:
     # https://drive.google.com/file/d/1YCox_4kJ-BYeXq27uUbasu--yz28zUMV/view?usp=sharing
-    age_model_.load_weights(AGE_MODEL_PATH)
+    age_model_.load_weights(AGE_MODEL_WEIGHT_PATH)
+    age_model_.save("age_model.h5")
 
     return age_model_
 
@@ -35,7 +36,8 @@ def gender_model():
 
     # you can find the pre-trained weights for gender prediction here:
     # https://drive.google.com/file/d/1wUXRVlbsni2FN9-jkS_f4UTUrm1bRLyk/view?usp=sharing
-    gender_model_.load_weights(GENDER_MODEL_PATH)
+    gender_model_.load_weights(GENDER_MODEL_WEIGHT_PATH)
+    gender_model_.save("gender_model.h5")
 
     return gender_model_
 

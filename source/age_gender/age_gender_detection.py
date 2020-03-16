@@ -3,10 +3,12 @@ import numpy as np
 import cv2
 
 from keras.preprocessing import image
-from utils.age_gender_model import age_model, gender_model
-from settings import MALE_ICON_PATH, FEMALE_ICON_PATH, FRONT_FACE_PATH, SAVING_TIME, LOCAL
+from keras.models import load_model
+from settings import MALE_ICON_PATH, FEMALE_ICON_PATH, FRONT_FACE_PATH, SAVING_TIME, LOCAL, AGE_MODEL_PATH, \
+    GENDER_MODEL_PATH, AGE_TRT_MODEL_PATH, GENDER_TRT_MODEL_PATH
 from source.face.face_match import FaceMatching
 from source.rest_api.request_post import send_data
+from source.age_gender.age_gender_trt_loader import TRTPredictor
 from utils.folder_file_manager import log_print
 
 
@@ -38,9 +40,12 @@ class AgeGenderDetector:
         female_icon = cv2.imread(FEMALE_ICON_PATH)
         self.female_icon = cv2.resize(female_icon, (40, 40))
         # -----------------------
-
-        self.age_mdl = age_model()
-        self.gender_mdl = gender_model()
+        if LOCAL:
+            self.age_mdl = load_model(AGE_MODEL_PATH)
+            self.gender_mdl = load_model(GENDER_MODEL_PATH)
+        else:
+            self.age_mdl = TRTPredictor(AGE_TRT_MODEL_PATH, sess_name='age')
+            self.gender_mdl = TRTPredictor(GENDER_TRT_MODEL_PATH, sess_name='gender')
 
         # age model has 101 outputs and its outputs will be multiplied by its index label. sum will be apparent age
         self.output_indexes = np.array([i for i in range(0, 101)])
@@ -91,7 +96,7 @@ class AgeGenderDetector:
             else:
                 ret, img_1 = cap_1.read()
                 ret, img_2 = cap_2.read()
-            # img = cv2.resize(img, (640, 360))
+                # img = cv2.resize(img, (640, 360))
 
                 self.detect_one_frame(img=img_1, csi_port=0)
                 self.detect_one_frame(img=img_2, csi_port=1)
@@ -123,7 +128,7 @@ class AgeGenderDetector:
             ages = []
             genders = []
             for (x, y, w, h) in faces:
-                if w > 130:  # ignore small faces
+                if w > 90:  # ignore small faces
 
                     # mention detected face
                     """overlay = img.copy(); output = img.copy(); opacity = 0.6
@@ -140,10 +145,14 @@ class AgeGenderDetector:
                         margin = 30
                         margin_x = int((w * margin) / 100)
                         margin_y = int((h * margin) / 100)
-                        detected_face = img[int(y - margin_y):int(y + h + margin_y),
-                                        int(x - margin_x):int(x + w + margin_x)]
-                        face_box = [int(y - margin_y), int(x + w + margin_x), int(y + h + margin_y),
-                                    int(x - margin_x)]
+                        detected_face = img[adjust_boundary_value(int(y - margin_y), 0):adjust_boundary_value(
+                            int(y + h + margin_y), img.shape[0]),
+                                        adjust_boundary_value(int(x - margin_x), 0): adjust_boundary_value(
+                                            int(x + w + margin_x), img.shape[1])]
+                        face_box = [adjust_boundary_value(int(y - margin_y), 0), adjust_boundary_value(
+                                            int(x + w + margin_x), img.shape[1]), adjust_boundary_value(
+                            int(y + h + margin_y), img.shape[0]),
+                                    adjust_boundary_value(int(x - margin_x), 0)]
 
                     except Exception as e:
                         log_print(e)
@@ -256,5 +265,21 @@ class AgeGenderDetector:
         return self.face_info
 
 
+def adjust_boundary_value(val, thresh_val):
+
+    if thresh_val > 0:
+        if val > thresh_val:
+            return thresh_val
+        else:
+            return val
+    else:
+        if val < thresh_val:
+            return thresh_val
+        else:
+            return val
+
+
 if __name__ == '__main__':
-    AgeGenderDetector().detect_age_gender()
+    # AgeGenderDetector().detect_age_gender()
+    frame = cv2.imread("/media/mensa/Data/Task/JetsonAgeGender/man.jpeg")
+    AgeGenderDetector().detect_one_frame(img=frame, csi_port=0)

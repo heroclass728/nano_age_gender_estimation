@@ -1,0 +1,133 @@
+FROM balenalib/jetson-nano-ubuntu:bionic
+
+ARG DRIVER_PACK="Jetson-210_Linux_R32.2.1_aarch64.tbz2"
+ARG POWER_MODE=0000
+
+COPY deb/$DRIVER_PACK .
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends bzip2 ca-certificates curl lbzip2 sudo htop curl wget && \
+    apt-get install -y zip git python3 python3-pip python3-numpy python3-dev cmake systemd python3-scipy && \
+    apt-get install -y python3-six python3-theano python3-yaml python3-keras && \
+    tar -xpj --overwrite -f ./${DRIVER_PACK} && \
+    sed -i '/.*tar -I lbzip2 -xpmf ${LDK_NV_TEGRA_DIR}\/config\.tbz2.*/c\tar -I lbzip2 -xpm --overwrite -f ${LDK_NV_TEGRA_DIR}\/config.tbz2' ./Linux_for_Tegra/apply_binaries.sh && \
+    ./Linux_for_Tegra/apply_binaries.sh -r / && \
+    rm -rf ./Linux_for_Tegra && \
+    rm ./${DRIVER_PACK} && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip3 install jetson-stats
+
+ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra-egl:${LD_LIBRARY_PATH}
+
+RUN ln -s /usr/lib/aarch64-linux-gnu/tegra/libnvidia-ptxjitcompiler.so.32.1.0 /usr/lib/aarch64-linux-gnu/tegra/libnvidia-ptxjitcompiler.so && \
+    ln -s /usr/lib/aarch64-linux-gnu/tegra/libnvidia-ptxjitcompiler.so.32.1.0 /usr/lib/aarch64-linux-gnu/tegra/libnvidia-ptxjitcompiler.so.1 && \
+    ln -sf /usr/lib/aarch64-linux-gnu/tegra/libGL.so /usr/lib/aarch64-linux-gnu/libGL.so && \
+    ln -s /usr/lib/aarch64-linux-gnu/libcuda.so /usr/lib/aarch64-linux-gnu/libcuda.so.1 && \
+    ln -sf /usr/lib/aarch64-linux-gnu/tegra-egl/libEGL.so /usr/lib/aarch64-linux-gnu/libEGL.so
+
+RUN ln -s /etc/nvpmodel/nvpmodel_t210_jetson-nano.conf /etc/nvpmodel.conf && \
+    ln -s /etc/systemd/system/nvpmodel.service /etc/systemd/system/multi-user.target.wants/nvpmodel.service && \
+    mkdir /var/lib/nvpmodel && \
+    echo "/etc/nvpmodel.conf" > /var/lib/nvpmodel/conf_file_path && \
+    echo "pmode:${POWER_MODE} fmode:fanNull" > /var/lib/nvpmodel/status
+
+ARG CUDA_TOOLKIT="cuda-repo-l4t-10-0-local-10.0.326"
+ARG CUDA_TOOLKIT_PKG="${CUDA_TOOLKIT}_1.0-1_arm64.deb"
+
+COPY deb/$CUDA_TOOLKIT_PKG .
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    dpkg --force-all -i ${CUDA_TOOLKIT_PKG} && \
+    rm ${CUDA_TOOLKIT_PKG} && \
+    apt-key add var/cuda-repo-*-local*/*.pub && \
+    apt-get update && \
+    apt-get install -y --allow-downgrades cuda-toolkit-10-0 libgomp1 libfreeimage-dev libopenmpi-dev openmpi-bin && \
+    dpkg --purge ${CUDA_TOOLKIT} && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV CUDA_HOME=/usr/local/cuda
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64
+ENV PATH=$PATH:$CUDA_HOME/bin
+
+ENV CUDNN_VERSION 7.5.0.56
+ENV CUDNN_PKG_VERSION=${CUDNN_VERSION}-1
+LABEL com.nvidia.cudnn.version="${CUDNN_VERSION}"
+
+COPY deb/libcudnn7_$CUDNN_VERSION-1+cuda10.0_arm64.deb .
+COPY deb/libcudnn7-dev_$CUDNN_VERSION-1+cuda10.0_arm64.deb .
+COPY deb/libcudnn7-doc_$CUDNN_VERSION-1+cuda10.0_arm64.deb .
+
+RUN dpkg -i libcudnn7_$CUDNN_VERSION-1+cuda10.0_arm64.deb && \
+    dpkg -i libcudnn7-dev_$CUDNN_VERSION-1+cuda10.0_arm64.deb && \
+    dpkg -i libcudnn7-doc_$CUDNN_VERSION-1+cuda10.0_arm64.deb && \
+    rm libcudnn7_$CUDNN_VERSION-1+cuda10.0_arm64.deb && \
+    rm libcudnn7-dev_$CUDNN_VERSION-1+cuda10.0_arm64.deb && \
+    rm libcudnn7-doc_$CUDNN_VERSION-1+cuda10.0_arm64.deb
+
+#
+#COPY ./deb/*.* ./
+#
+#ENV DEBIAN_FRONTEND noninteractive
+#
+#RUN \
+#    dpkg -i cuda-repo-l4t-10-0-local-10.0.326_1.0-1_arm64.deb \
+#    libcudnn7_7.5.0.56-1+cuda10.0_arm64.deb \
+#    libcudnn7-dev_7.5.0.56-1+cuda10.0_arm64.deb && \
+#    apt-key add /var/cuda-repo-10-0-local-10.0.326/*.pub && \
+#    apt-get update && \
+#    apt-get install cuda-compiler-10-0 cuda-samples-10-0 -y && \
+#    rm -rf *.deb && \
+#    dpkg --remove cuda-repo-l4t-10-0-local-10.0.326 && \
+#    dpkg -P cuda-repo-l4t-10-0-local-10.0.326 && \
+#    mv /usr/local/cuda-10.0 /usr/local/cuda && \
+#    echo "/usr/lib/aarch64-linux-gnu/tegra" > /etc/ld.so.conf.d/nvidia-tegra.conf && \
+#    ldconfig
+#
+## If planning to do only headles GPU computing, without video
+## display do not install xorg
+#RUN apt-get update && apt-get install lbzip2 xorg -y && \
+#    tar xjf nvidia_drivers.tbz2 -C / && \
+#    tar xjf config.tbz2 -C / --exclude=etc/hosts --exclude=etc/hostname && \
+#    echo "/usr/lib/aarch64-linux-gnu/tegra" > /etc/ld.so.conf.d/nvidia-tegra.conf && ldconfig && \
+#    rm -rf *.tbz2
+
+# base-image for python on any machine using a template variable,
+# see more about dockerfile templates here: https://www.balena.io/docs/learn/develop/dockerfile/
+
+# use `install_packages` if you need to install dependencies,
+# for instance if you need git, just uncomment the line below.
+# RUN install_packages git
+
+RUN pip3 install -U pip
+
+RUN pip3 install setuptools Cython dlib requests face_recognition pandas
+
+COPY deb/opencv-4.1.0.zip .
+COPY deb/opencv_contrib-4.1.0.zip .
+COPY ./build_opencv_4_1.sh ./build_opencv_4_1.sh
+RUN ./build_opencv_4_1.sh
+
+RUN apt update
+RUN apt install -y libhdf5-serial-dev hdf5-tools
+RUN pip3 install --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v42 tensorflow-gpu==1.13.1+nv19.3 --user
+
+WORKDIR /usr/src/app
+# This will copy all files in our root to the working  dire
+#WORKDIR /usr/src/appctory in the container
+COPY ./source ./source
+COPY ./utils ./utils
+COPY ./app.py ./app.py
+COPY ./settings.py ./settings.py
+
+RUN wget  -O ./utils/gender_model_weights.h5 "https://drive.google.com/file/d/1YCox_4kJ-BYeXq27uUbasu--yz28zUMV/view?usp=sharing"
+RUN wget  -O ./utils/age_model_weights.h5 "https://drive.google.com/file/d/1wUXRVlbsni2FN9-jkS_f4UTUrm1bRLyk/view?usp=sharing"
+
+# Enable udevd so that plugged dynamic hardware devices show up in our container.
+ENV UDEV=1
+
+# main.py will run when container starts up on the device
+#CMD ["python3","-u","app.py"]
+ CMD ["sleep", "infinity"]
